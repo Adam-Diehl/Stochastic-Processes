@@ -1,0 +1,87 @@
+%Fourth Order Runge-Kutta Monte-Carlo Method for Geometric Brownian Motion
+
+%Notes
+
+%Adam Diehl
+%Version 1.0
+%Last updated Apr 21, 2017
+
+%Variables
+    %y0: initial position
+    %mu: drift rate
+    %sigma: volatility
+    %N: Number of realizations
+    %dt: time-step
+    %Tcheck: [Optional] value of t to report first and second order statistics (w/in
+        %the unit interval [0,1])
+    %plot: [Optional] Include a plot of the paths
+ 
+%%
+%Function
+
+function y = RK4GBM(y0,mu,sigma,N,dt,Tcheck,draw)
+
+%Set default plot behavior to 'no plot' and Tcheck to 1 if no input given
+if nargin < 6
+    Tcheck = 1;
+    draw = 0;
+elseif nargin < 7
+    draw = 0;
+end
+
+%Set index for sum
+T = floor(1/dt);
+
+%Set check point for evaluating first and second order statistics
+if Tcheck <= dt %MATLAB doesn't like index positions of zero
+    Tchk = 1; 
+else    
+Tchk = floor(Tcheck/dt);
+end
+
+    %Generate matrix to store solutions to diff-eq
+y = zeros(T+1,N);
+
+    %Set initial condition
+y(1,:) = y0;
+
+    %Create white noise
+W = randn(T+1,N);
+
+    %RK4 with fixed time-step
+for i=1:T    
+  k1 = dt.*(mu.*y(i,:)+sigma.*y(i,:).*(sqrt(dt)/dt).*W(i,:));
+  k2 = dt.*((mu.*y(i,:)+k1/2)+(sigma.*y(i,:).*(sqrt(dt)/dt).*W(i,:)+dt/2));
+  k3 = dt.*((mu.*y(i,:)+k2/2)+(sigma.*y(i,:).*(sqrt(dt)/dt).*W(i,:)+dt/2));
+  k4 = dt.*((mu.*y(i,:)+k3)+(sigma.*y(i,:)*(sqrt(dt)/dt).*W(i,:)+dt));
+    %Note that (above) we want dt to drop out of the second term and be 
+        %replaced by sqrt(dt) to generate GBM
+        
+  %Calculate the next column of y
+  y(i+1,:) = y(i,:)+(k1+2.*(k2+k3)+k4)/6;
+end
+
+    %Drop last value of y (artifact of RK4 process)
+y = y(1:T,:);
+
+disp('Sample paths computed successfully.')
+disp(' ');
+
+    %Report first and second order statistics
+avg = mean(y(Tchk,:));
+stdev = sqrt(var(y(Tchk,:)));
+FOAE = abs(y0*exp(mu*Tcheck) - avg); %First Order Absolute Error
+SOAE = abs(sqrt(y0^2*exp(2*mu*Tcheck)*(exp(sigma^2 * Tcheck) - 1)) - stdev); %Second Order Absolute Error
+FORE = (FOAE)/(y0*exp(mu*Tcheck)); %First Order Relative Error
+SORE = (SOAE)/(sqrt(y0^2*exp(2*mu*Tcheck)*(exp(sigma^2 * Tcheck) - 1))); %Second Order Relative Error
+
+fprintf('First order mean abs. error at time T is %f\n',FOAE);
+fprintf('Second order mean abs. error at time T is %f\n',SOAE);
+fprintf('First order mean rel. error at time T is %f\n',FORE);
+fprintf('Second order mean rel. error at time T is %f\n',SORE);
+
+    %Plot the output
+if draw == 1
+    plot(y,'LineWidth',1.5);
+    xlim([0,T])
+end
